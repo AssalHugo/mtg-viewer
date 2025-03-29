@@ -26,6 +26,7 @@ class ImportCardCommand extends Command
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly LoggerInterface        $logger,
+        private readonly Profiler               $profiler,
         private array                           $csvHeader = []
     )
     {
