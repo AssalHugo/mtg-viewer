@@ -12,7 +12,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use OpenApi\Attributes as OA;
 use Symfony\Component\Routing\Annotation\Route;
-use Symfony\Component\HttpFoundation\Request;
 
 #[Route('/api/card', name: 'api_card_')]
 #[OA\Tag(name: 'Card', description: 'Routes for all about cards')]
@@ -50,7 +49,7 @@ class ApiCardController extends AbstractController
         ]);
     }
 
-    #[Route('/{uuid}', name: 'Show card', methods: ['GET'])]
+    #[Route('/{uuid}', name: 'Show card', requirements: ['uuid' => '[0-9a-fA-F\-]{36}'], methods: ['GET'])]
     #[OA\Parameter(name: 'uuid', description: 'UUID of the card', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
     #[OA\Put(description: 'Get a card by UUID')]
     #[OA\Response(response: 200, description: 'Show card')]
@@ -66,7 +65,6 @@ class ApiCardController extends AbstractController
         return $this->json($card);
     }
 
-    // src/Controller/ApiCardController.php
 
     #[Route('/search', name: 'Search cards', methods: ['GET'])]
     #[OA\Get(description: 'Search cards by name')]
