@@ -34,51 +34,57 @@ class ImportCardCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $this->logger->info('Début de l\'importation');
         ini_set('memory_limit', '2G');
-        // On récupère le temps actuel
         $io = new SymfonyStyle($input, $output);
         $filepath = __DIR__ . '/../../data/cards.csv';
         $handle = fopen($filepath, 'r');
 
-        // On récupère le temps actuel
         $start = microtime(true);
 
         $this->logger->info('Importing cards from ' . $filepath);
         if ($handle === false) {
             $io->error('File not found');
+            $this->logger->error('File not found');
             return Command::FAILURE;
         }
 
         $i = 0;
         $this->csvHeader = fgetcsv($handle);
-        $uuidInDatabase = $this->entityManager->getRepository(Card::class)->getAllUuids();
+        $uuidInDatabase = array_flip($this->entityManager->getRepository(Card::class)->getAllUuids());
 
         $progressIndicator = new ProgressIndicator($output);
         $progressIndicator->start('Importing cards...');
 
-        while (($row = $this->readCSV($handle)) !== false) {
-            $i++;
+        $this->entityManager->beginTransaction();
+        try {
+            while (($row = $this->readCSV($handle)) !== false) {
+                $i++;
 
-            if (!in_array($row['uuid'], $uuidInDatabase)) {
-                $this->addCard($row);
-            }
+                if (!isset($uuidInDatabase[$row['uuid']])) {
+                    $this->addCard($row);
+                }
 
-            if ($i % 2000 === 0) {
-                $this->entityManager->flush();
-                $this->entityManager->clear();
-                $progressIndicator->advance();
+                if ($i % 1000 === 0) {
+                    $this->entityManager->flush();
+                    $this->entityManager->clear();
+                    $progressIndicator->advance();
+                }
             }
+            $this->entityManager->flush();
+            $this->entityManager->commit();
+        } catch (\Exception $e) {
+            $this->entityManager->rollback();
+            throw $e;
         }
-        // Toujours flush en sorti de boucle
-        $this->entityManager->flush();
         $progressIndicator->finish('Importing cards done.');
 
         fclose($handle);
 
-        // On récupère le temps actuel, et on calcule la différence avec le temps de départ
         $end = microtime(true);
         $timeElapsed = $end - $start;
         $io->success(sprintf('Imported %d cards in %.2f seconds', $i, $timeElapsed));
+        $this->logger->info(sprintf('Imported %d cards in %.2f seconds', $i, $timeElapsed));
         return Command::SUCCESS;
     }
 
