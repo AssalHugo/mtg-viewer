@@ -5,11 +5,13 @@ namespace App\Controller;
 use App\Entity\Artist;
 use App\Entity\Card;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Tools\Pagination\Paginator;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use OpenApi\Attributes as OA;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\HttpFoundation\Request;
 
 #[Route('/api/card', name: 'api_card_')]
 #[OA\Tag(name: 'Card', description: 'Routes for all about cards')]
@@ -17,17 +19,34 @@ class ApiCardController extends AbstractController
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
-        private readonly LoggerInterface $logger
-    ) {
+        private readonly LoggerInterface        $logger
+    )
+    {
     }
+
     #[Route('/all', name: 'List all cards', methods: ['GET'])]
     #[OA\Put(description: 'Return all cards in the database')]
     #[OA\Response(response: 200, description: 'List all cards')]
-    public function cardAll(): Response
+    public function cardAll(Request $request): Response
     {
-        $cards = $this->entityManager->getRepository(Card::class)->findAll();
-        $this->logger->info('all cards', ['cards' => $cards]);
-        return $this->json($cards);
+        $page = $request->query->getInt('page', 1);
+        $limit = $request->query->getInt('limit', 20);
+
+        $queryBuilder = $this->entityManager->getRepository(Card::class)
+            ->createQueryBuilder('c')
+            ->setFirstResult(($page - 1) * $limit)
+            ->setMaxResults($limit);
+
+        $paginator = new Paginator($queryBuilder);
+        $totalItems = count($paginator);
+        $totalPages = ceil($totalItems / $limit);
+
+        $cards = $queryBuilder->getQuery()->getResult();
+
+        return $this->json([
+            'cards' => $cards,
+            'totalPages' => $totalPages,
+        ]);
     }
 
     #[Route('/{uuid}', name: 'Show card', methods: ['GET'])]
