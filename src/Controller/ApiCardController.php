@@ -8,10 +8,10 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\Pagination\Paginator;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use OpenApi\Attributes as OA;
 use Symfony\Component\Routing\Annotation\Route;
-use Symfony\Component\HttpFoundation\Request;
 
 #[Route('/api/card', name: 'api_card_')]
 #[OA\Tag(name: 'Card', description: 'Routes for all about cards')]
@@ -49,7 +49,7 @@ class ApiCardController extends AbstractController
         ]);
     }
 
-    #[Route('/{uuid}', name: 'Show card', methods: ['GET'])]
+    #[Route('/{uuid}', name: 'Show card', requirements: ['uuid' => '[0-9a-fA-F\-]{36}'], methods: ['GET'])]
     #[OA\Parameter(name: 'uuid', description: 'UUID of the card', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
     #[OA\Put(description: 'Get a card by UUID')]
     #[OA\Response(response: 200, description: 'Show card')]
@@ -63,5 +63,28 @@ class ApiCardController extends AbstractController
         }
         $this->logger->info('card by uuid', ['card' => $card]);
         return $this->json($card);
+    }
+
+
+    #[Route('/search', name: 'Search cards', methods: ['GET'])]
+    #[OA\Get(description: 'Search cards by name')]
+    #[OA\Parameter(name: 'name', description: 'Name of the card', in: 'query', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Response(response: 200, description: 'Search results')]
+    #[OA\Response(response: 400, description: 'Invalid search query')]
+    public function searchCards(Request $request): Response
+    {
+        $name = $request->query->get('name');
+        if (strlen($name) < 3) {
+            return $this->json(['error' => 'Search query must be at least 3 characters long'], 400);
+        }
+
+        $cards = $this->entityManager->getRepository(Card::class)->createQueryBuilder('c')
+            ->where('c.name LIKE :name')
+            ->setParameter('name', '%' . $name . '%')
+            ->setMaxResults(20)
+            ->getQuery()
+            ->getResult();
+
+        return $this->json($cards);
     }
 }
